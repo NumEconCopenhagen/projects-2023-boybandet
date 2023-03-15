@@ -1,4 +1,4 @@
-# \[Group name\]
+# \Boybandet\
 
 **Group members:**
 - bqj722 
