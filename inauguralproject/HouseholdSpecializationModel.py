@@ -24,7 +24,7 @@ class HouseholdSpecializationModelClass:
 
         # c. household production
         par.alpha = 0.5
-        par.sigma = 1.0
+        par.sigma = 1
 
         # d. wages
         par.wM = 1.0
@@ -44,6 +44,7 @@ class HouseholdSpecializationModelClass:
         sol.beta0 = np.nan
         sol.beta1 = np.nan
 
+
     def calc_utility(self,LM,HM,LF,HF):
         """ calculate utility """
 
@@ -53,9 +54,19 @@ class HouseholdSpecializationModelClass:
         # a. consumption of market goods
         C = par.wM*LM + par.wF*LF
 
-        # b. home production
-        H = HM**(1-par.alpha)*HF**par.alpha
+        # b. home production for different values of sigma
+        if par.sigma == 1:
+            H = HM**(1-par.alpha)*HF**par.alpha
+        
+        elif par.sigma == 0:
+            H = np.minimum(HM, HF)
+        
+        else:
+            HM = np.fmax(HM, 1e-07)
+            HF = np.fmax(HF, 1e-07)
+            H = ((1-par.alpha) * HM**((par.sigma - 1) / par.sigma) + par.alpha * HF**((par.sigma - 1) / par.sigma))**(par.sigma/(par.sigma - 1))
 
+    
         # c. total consumption utility
         Q = C**par.omega*H**(1-par.omega)
         utility = np.fmax(Q,1e-8)**(1-par.rho)/(1-par.rho)
@@ -68,7 +79,7 @@ class HouseholdSpecializationModelClass:
         
         return utility - disutility
 
-    def solve_discrete(self,do_print=False):
+    def solve_discrete(self, do_print=False):
         """ solve model discretely """
         
         par = self.par
@@ -99,12 +110,27 @@ class HouseholdSpecializationModelClass:
         opt.LF = LF[j]
         opt.HF = HF[j]
 
+        # Figure
+        fig = plt.figure()
+        ax = fig.add_subplot(1, 1, 1)
+        ax.plot(HF, HM)
+
+        ax.set_ylim([0, 24])
+        ax.set_xlim([0, 24])
+
+
         # e. print
         if do_print:
             for k,v in opt.__dict__.items():
                 print(f'{k} = {v:6.4f}')
 
         return opt
+        
+    
+        
+        
+
+    
 
     def solve(self,do_print=False):
         """ solve model continously """
