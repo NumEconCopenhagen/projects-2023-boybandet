@@ -110,13 +110,23 @@ class HouseholdSpecializationModelClass:
         opt.LF = LF[j]
         opt.HF = HF[j]
 
-        # Figure
-        fig = plt.figure()
-        ax = fig.add_subplot(1, 1, 1)
-        ax.plot(HF, HM)
+        # Loop over differet values for alpha
+        for self.alpha in np.linspace(0.25, 0.5, 0.75) :
+            self.ratio = opt.HF / opt.HM
 
-        ax.set_ylim([0, 24])
-        ax.set_xlim([0, 24])
+            return self.ratio
+        
+
+
+
+        
+        #fig = plt.figure()
+        #ax = fig.add_subplot(1, 1, 1)
+        #ax.plot(HF/HM, u)
+
+        #ax.set_ylim([0, 24])
+        #ax.set_xlim([0, 24])
+    
 
 
         # e. print
@@ -125,8 +135,6 @@ class HouseholdSpecializationModelClass:
                 print(f'{k} = {v:6.4f}')
 
         return opt
-        
-    
         
         
 
