@@ -110,16 +110,7 @@ class HouseholdSpecializationModelClass:
         opt.LF = LF[j]
         opt.HF = HF[j]
 
-        # Loop over differet values for alpha
-        for self.alpha in np.linspace(0.25, 0.5, 0.75) :
-            self.ratio = opt.HF / opt.HM
-
-            return self.ratio
-        
-
-
-
-        
+    
         #fig = plt.figure()
         #ax = fig.add_subplot(1, 1, 1)
         #ax.plot(HF/HM, u)
@@ -135,7 +126,26 @@ class HouseholdSpecializationModelClass:
                 print(f'{k} = {v:6.4f}')
 
         return opt
-        
+
+
+    def plot_ratios_alpha(self): #Virker ikke helt korrekt
+        """ plots the ratio for different alphas """
+        par = self.par
+        alpha_vec = (0.25, 0.5, 0.75)
+    
+
+        alpha_ratios = [] #initialize empty list
+        # loop over the different values for alpha
+        for par.alpha in alpha_vec:
+            result = self.solve_discrete(par.alpha)
+            
+
+            
+
+            #ratio = HF / HM
+
+            #alpha_ratios = alpha_ratios.append(ratio)
+        return result
         
 
     
