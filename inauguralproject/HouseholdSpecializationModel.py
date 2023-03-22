@@ -128,10 +128,10 @@ class HouseholdSpecializationModelClass:
         return opt
 
 
-    def plot_ratios_alpha(self): #Virker ikke helt korrekt
+    def plot_ratios_alpha(self): #Virker mærkeligt - 0.5 er nødt til at være til sidst før den fatter alpha skal være 0.5 fremover (ligesom i baseline modellen)
         """ plots the ratio for different alphas """
         par = self.par
-        alpha_vec = (0.25, 0.5, 0.75)
+        alpha_vec = (0.25, 0.75, 0.50)
     
 
         alpha_ratios = [] #initialize empty list
@@ -146,9 +146,9 @@ class HouseholdSpecializationModelClass:
 
             #alpha_ratios = alpha_ratios.append(ratio)
         return result
-        
-
     
+
+
 
     def solve(self,do_print=False):
         """ solve model continously """

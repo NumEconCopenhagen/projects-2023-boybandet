@@ -1,4 +1,4 @@
-# \Boybandet\
+# Boybandet
 
 **Group members:**
 - bqj722 
