@@ -198,36 +198,43 @@ class HouseholdSpecializationModelClass:
         ax.set_ylim()
         ax.set_xlim([-0.25,0.25])
 
+ # a. objective function to minimize
+    def value_of_choice(self,LM, HM, LF, HF):
 
+        # A penalty is added
+        penalty = 0
+        E = (LM+HM) | (LF+HF)
+        if E > 24: #Labour > 24 -> not allowed
+            fac = 24/E # fac < 1 if labour to high
+            penalty += 1000*(E-24) # calculate pentaly
+            LM *= fac # force E = I
+            HM *= fac # force E = I
+            LF *= fac # force E = I
+            HF *= fac # force E = I
+            
+        return -self.calc_utility() + penalty
+        
     def solve_cont(self,do_print=False):
         """ solve model continously """       
         par = self.par
         sol = self.sol 
         
-
-        u = self.calc_utility(LM,HM,LF,HF)
-    
-     # a. objective function (to minimize) 
-        obj = lambda x: -self.calc_utility() # minimize -> negative of utility
+        initial_guess = [24/par.wM/2, 24/par.wM/2, 24/par.wF/2, 24/par.wF/2]
+        sol_case = optimize.minimize(
+            self.value_of_choice, initial_guess, method="Nelder-Mead",
+            args=(self))
         
-     # b. constraints and bounds
-        budget_constraint = lambda x:  (LM+HM < 24) | (LF+HF < 24) 
-        constraints = ({'type':'ineq','fun':budget_constraint})
-        bounds = ((1e-8,par.m/par.p1-1e-8),(1e-8,par.m/par.p2-1e-8))
-    
-        # why all these 1e-8? To avoid ever having x1 = 0 or x2 = 0
-    
-     # c. call solver
-        x0 = [(par.m/par.p1)/2,(par.m/par.p2)/2]
-        result = optimize.minimize(obj,x0,method='SLSQP',bounds=bounds,constraints=constraints)
-        
-     # d. save
-     
-        sol.LM_vec = result.LM_vec
-        sol.x2 = result.x[1]
-        sol.u = model.u_func(sol.x1,sol.x2)
-    
+        # unpack solution
+        LM = sol_case.LM
+        HM = sol_case.HM
+        LF = sol_case.LF
+        HF = sol_case.HF
+        print(LM,HM,LF,HF)
 
+
+
+        
+    
     def solve_wF_vec(self,discrete=False):
         """ solve model for vector of female wages """
 
