@@ -123,19 +123,20 @@ class HouseholdSpecializationModelClass:
         return opt
 
 
-    def plot_ratios_alpha(self): #Virker mærkeligt - 0.5 er nødt til at være til sidst før den fatter alpha skal være 0.5 fremover (ligesom i baseline modellen)
+    def plot_ratios_alpha(self):
         """ plots the ratio for different alphas """
         par = self.par
-        alpha_vec = (0.25, 0.50 , 0.75 )
+        alpha_vec = (0.25, 0.50 , 0.75) # Values for alpha
         print("Plot the relationship between the ratio of working home between genders and alpha and sigma respectively")
 
         alpha_ratios = [] #initialize empty list
-        # loop over the different values for alpha
+        # a. loop over the different values for alpha
         for par.alpha in alpha_vec:
             result = self.solve_discrete(par.alpha)
             ratio = result.HF / result.HM 
             alpha_ratios.append(ratio)
         
+        # b. plot figure for alpha
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
         ax.scatter(alpha_vec, alpha_ratios)
@@ -148,21 +149,21 @@ class HouseholdSpecializationModelClass:
         par.alpha = 0.5
 
         
-    def plot_ratios_sigma(self): #Virker mærkeligt - 0.5 er nødt til at være til sidst før den fatter alpha skal være 0.5 fremover (ligesom i baseline modellen)
+    def plot_ratios_sigma(self):
         """ plots the ratio for different alphas """
         par = self.par
         sigma_vec = (0.5, 1 , 1.5 )
         
-    
-     
+
 
         sigma_ratios = [] #initialize empty list
-        # loop over the different values for alpha
+        # a. loop over the different values for sigma
         for par.sigma in sigma_vec:
             result = self.solve_discrete(par.sigma)
             ratio = result.HF / result.HM 
             sigma_ratios.append(ratio)
         
+        # b. plot figure for sigma
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
         ax.scatter(sigma_vec, sigma_ratios)
@@ -173,7 +174,7 @@ class HouseholdSpecializationModelClass:
         ax.set_xlim([0.4,1.6])
     
     
-    def plot_logratios_discrete(self): #Virker mærkeligt - 0.5 er nødt til at være til sidst før den fatter alpha skal være 0.5 fremover (ligesom i baseline modellen)
+    def plot_logratios_discrete(self):
         """ plots the ratio for different alphas """
         par = self.par
      
@@ -181,7 +182,7 @@ class HouseholdSpecializationModelClass:
         log_workratios = [] #initialize empty list
         log_wageratios = [] #initialize empty list
 
-        # loop over the different values for wF
+        # a. loop over the different values for wF
         for par.wF in par.wF_vec:
             result = self.solve_discrete(par.wF)
             log_workratiosCalc = np.log(result.HF / result.HM)
@@ -189,6 +190,7 @@ class HouseholdSpecializationModelClass:
             log_wageratiosCalc = np.log(par.wF / par.wM)
             log_wageratios.append(log_wageratiosCalc)
         
+        # b. plot figure for different values of wF
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
         ax.scatter(log_wageratios, log_workratios )
@@ -198,10 +200,9 @@ class HouseholdSpecializationModelClass:
         ax.set_ylim()
         ax.set_xlim([-0.25,0.25])
 
- # a. objective function to minimize
-    def value_of_choice(self,LM, HM, LF, HF):
+    def value_of_choice(self, LM, HM, LF, HF):
 
-        # A penalty is added
+        # a. penalty is added
         penalty = 0
         E = (LM+HM) | (LF+HF)
         if E > 24: #Labour > 24 -> not allowed
@@ -212,17 +213,16 @@ class HouseholdSpecializationModelClass:
             LF *= fac # force E = I
             HF *= fac # force E = I
             
-        return -self.calc_utility() + penalty
+        return -self.calc_utility(LM, HM, LF, HF) + penalty
         
     def solve_cont(self,do_print=False):
         """ solve model continously """       
         par = self.par
         sol = self.sol 
         
-        initial_guess = [24/par.wM/2, 24/par.wM/2, 24/par.wF/2, 24/par.wF/2]
+        initial_guess = [24/par.wM/2, 24/par.wM/2, 24/par.wF/2, 24/par.wF/2] # initial guess is made 
         sol_case = optimize.minimize(
-            self.value_of_choice, initial_guess, method="Nelder-Mead",
-            args=(self))
+            self.value_of_choice, initial_guess, method="Nelder-Mead", args=(self))
         
         # unpack solution
         LM = sol_case.LM
