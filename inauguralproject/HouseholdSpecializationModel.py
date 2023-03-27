@@ -146,6 +146,7 @@ class HouseholdSpecializationModelClass:
         ax.set_ylim()
         ax.set_xlim([0.2,0.8])
 
+        # c. Returns alpha to its original
         par.alpha = 0.5
 
         
@@ -172,6 +173,9 @@ class HouseholdSpecializationModelClass:
         ax.set_title("Ratio between working from home dependent on sigma")
         ax.set_ylim()
         ax.set_xlim([0.4,1.6])
+
+        # c. Returns sigma to its original
+        par.sigma = 1.0
     
     
     def plot_logratios_discrete(self):
