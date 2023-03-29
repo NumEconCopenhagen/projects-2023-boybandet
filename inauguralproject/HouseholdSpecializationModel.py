@@ -6,6 +6,7 @@ from scipy import optimize
 
 import pandas as pd 
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 class HouseholdSpecializationModelClass:
 
@@ -122,7 +123,6 @@ class HouseholdSpecializationModelClass:
         """ plots the ratio for different alphas """
         par = self.par
         alpha_vec = (0.25, 0.50 , 0.75) # Values for alpha
-        print("Plot the relationship between the ratio of working home between genders and alpha and sigma respectively")
 
         alpha_ratios = [] #initialize empty list
         # a. loop over the different values for alpha
@@ -192,7 +192,7 @@ class HouseholdSpecializationModelClass:
         # b. plot figure for different values of wF
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
-        ax.scatter(log_wageratios, log_workratios )
+        ax.plot(log_wageratios, log_workratios )
         ax.set_ylabel("log_workratios")
         ax.set_xlabel("log_wageratios")
         ax.set_title("Log workratios and log wage ratios when varying female wages")
@@ -224,11 +224,6 @@ class HouseholdSpecializationModelClass:
         opt.LF = sol_case.x[2]
         opt.HF = sol_case.x[3]
         
-
-        if do_print:
-            print(opt.LM, opt.HM, opt.LF, opt.HF)
-
-
         return opt
 
     #Define how the continuous solution changes with wF
@@ -303,11 +298,6 @@ class HouseholdSpecializationModelClass:
         sol = self.sol
         opt = SimpleNamespace()
 
-        #Defining loss-function by using the target values
-        #loss = (par.beta0_target - sol.beta0)**2 + (par.beta1_target - sol.beta1)**2
-        
-        
-
         def objective(x):
 
             par = self.par
@@ -334,4 +324,23 @@ class HouseholdSpecializationModelClass:
         alpha = result.x[0]
         sigma = result.x[1]
 
-        print("Optimal values for alpha and sigma are " +str(alpha)  + " and "+ str(sigma))
+        print("Optimal values for alpha and sigma are " +str(alpha)  + " and "+ str(sigma) +". Down below a plot that illustrates how the model fits the data is made")
+
+        #Creating 3D-plot:
+        fig = plt.figure(figsize = (10,10))
+        ax = plt.axes(projection = "3d")
+
+        alpha_grid, sigma_grid = np.meshgrid(np.linspace(alpha-0.2, alpha+0.2, 10), np.linspace(sigma-0.2, sigma+0.2, 10))
+        aladdin = [alpha_grid, sigma_grid]
+        errors = np.zeros_like(alpha_grid)
+
+        for i in range(len(alpha_grid)):
+            for j in range(len(sigma_grid)):
+                errors[i,j] = objective([alpha_grid[i,j], sigma_grid[i,j]])
+
+        ax.plot_surface(alpha_grid, sigma_grid, errors, cmap="viridis")
+        ax.set_xlabel("alpha")
+        ax.set_ylabel("sigma")
+        ax.set_zlabel("errors")
+        ax.set_title("How the std. error varies with different values for alpha and sigma")
+        plt.show
