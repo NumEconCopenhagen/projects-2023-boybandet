@@ -205,6 +205,8 @@ class HouseholdSpecializationModelClass:
         par = self.par
         sol = self.sol 
 
+        opt = SimpleNamespace()
+
         # The objective is defined
         objective = lambda x: -self.calc_utility(x[0], x[1], x[2], x[3])
         
@@ -217,19 +219,23 @@ class HouseholdSpecializationModelClass:
             objective, initial_guess, method="Nelder-Mead", bounds = bounds)
         
         # unpack solution
-        sol.LM = sol_case.x[0]
-        sol.HM = sol_case.x[1]
-        sol.LF = sol_case.x[2]
-        sol.HF = sol_case.x[3]
-        print(sol.LM,sol.HM, sol.LF, sol.HF)
+        opt.LM = sol_case.x[0]
+        opt.HM = sol_case.x[1]
+        opt.LF = sol_case.x[2]
+        opt.HF = sol_case.x[3]
+        
 
-        return sol
+        if do_print:
+            print(opt.LM, opt.HM, opt.LF, opt.HF)
 
-    #´Define the how the cont changes with wF
-    def changes_wF(self):
+
+        return opt
+
+    #Define how the continuous solution changes with wF
+    def changes_wF(self, doprint = True):
         """ plots the the log relations for different values of wF"""
         par = self.par
-     
+        sol = self.sol
 
         log_workratios = [] #initialize empty list
         log_wageratios = [] #initialize empty list
@@ -242,35 +248,90 @@ class HouseholdSpecializationModelClass:
             log_wageratiosCalc = np.log(par.wF / par.wM)
             log_wageratios.append(log_wageratiosCalc)
         
-        # b. plot figure for different values of wF
-        fig = plt.figure()
-        ax = fig.add_subplot(1, 1, 1)
-        ax.scatter(log_wageratios, log_workratios )
-        ax.set_ylabel("log_workratios")
-        ax.set_xlabel("log_wageratios")
-        ax.set_title("Log workratios and log wage ratios when varying female wages")
-        ax.set_ylim()
-        ax.set_xlim()
+        if doprint:
+            #b. plot figure for different values of wF
+            fig = plt.figure()
+            ax = fig.add_subplot(1, 1, 1)
+            ax.scatter(log_wageratios, log_workratios )
+            ax.set_ylabel("log of HF/HM")
+            ax.set_xlabel("log of wF/wM")
+            ax.set_title("Log work ratios and log wage ratios when varying female wages")
+            ax.set_ylim()
+            ax.set_xlim()
 
         
     
-    def solve_wF_vec(self,discrete=False):
+    def solve_wF_vec(self):  #MIGHT BE DELETED!
         """ solve model for vector of female wages """
 
+        par = self.par
+        sol = self.sol
+
+        for i, wF in enumerate(par.wF_vec):
+            #Set wF for this iteration
+            par.wF = wF
+            #Solve for optimal choices
+            opt = self.solve_cont()
+            #Store results in solution arrays
+            sol.HM_vec[i] = opt.HM
+            sol.HF_vec[i] = opt.HF
+            
         pass
 
-    def run_regression(self):
+
+    
+    def run_regression(self): 
         """ run regression """
 
         par = self.par
         sol = self.sol
 
+        # Taking logs of used vectors
         x = np.log(par.wF_vec)
         y = np.log(sol.HF_vec/sol.HM_vec)
+
         A = np.vstack([np.ones(x.size),x]).T
         sol.beta0,sol.beta1 = np.linalg.lstsq(A,y,rcond=None)[0]
-    
+
+        pass
+
+
     def estimate(self,alpha=None,sigma=None):
         """ estimate alpha and sigma """
 
-        pass
+        par = self.par
+        sol = self.sol
+        opt = SimpleNamespace()
+
+        #Defining loss-function by using the target values
+        #loss = (par.beta0_target - sol.beta0)**2 + (par.beta1_target - sol.beta1)**2
+        
+        
+
+        def objective(x):
+
+            par = self.par
+            sol = self.sol
+
+            par.alpha, par.sigma = x 
+
+            target_beta0 = par.beta0_target
+            target_beta1 = par.beta1_target
+            
+            self.solve_wF_vec()
+            self.run_regression()
+
+            objective_loss = (target_beta0 - sol.beta0)**2 + (target_beta1 - sol.beta1)**2
+
+            return objective_loss
+        
+        bounds = ((1e-8,1), (1e-8,5))
+
+        initial_guess = [0.5, 1]
+        
+        result = optimize.minimize(objective, initial_guess, bounds = bounds, method = "Nelder-Mead")
+
+        alpha = result.x[0]
+        sigma = result.x[1]
+
+        print("Optimal values for alpha and sigma are " +str(alpha)  + " and "+ str(sigma))
