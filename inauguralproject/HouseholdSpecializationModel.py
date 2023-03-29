@@ -110,11 +110,6 @@ class HouseholdSpecializationModelClass:
         opt.LF = LF[j]
         opt.HF = HF[j]
 
-            
-     
-    
-
-
         # e. print
         #if do_print == True:
          #   for k,v in opt.__dict__.items():
@@ -179,7 +174,7 @@ class HouseholdSpecializationModelClass:
     
     
     def plot_logratios_discrete(self):
-        """ plots the ratio for different alphas """
+        """ plots the ratio for different wFs """
         par = self.par
      
 
@@ -204,38 +199,58 @@ class HouseholdSpecializationModelClass:
         ax.set_ylim()
         ax.set_xlim([-0.25,0.25])
 
-    def value_of_choice(self, LM, HM, LF, HF):
 
-        # a. penalty is added
-        penalty = 0
-        E = (LM+HM) | (LF+HF)
-        if E > 24: #Labour > 24 -> not allowed
-            fac = 24/E # fac < 1 if labour to high
-            penalty += 1000*(E-24) # calculate pentaly
-            LM *= fac # force E = I
-            HM *= fac # force E = I
-            LF *= fac # force E = I
-            HF *= fac # force E = I
-            
-        return -self.calc_utility(LM, HM, LF, HF) + penalty
-        
     def solve_cont(self,do_print=False):
         """ solve model continously """       
         par = self.par
         sol = self.sol 
+
+        # The objective is defined
+        objective = lambda x: -self.calc_utility(x[0], x[1], x[2], x[3])
         
+        # We define bounds
+        bounds = ((1e-8,24-1e-8), (1e-8,24-1e-8), (1e-8,24-1e-8), (1e-8,24-1e-8))
+
         initial_guess = [24/par.wM/2, 24/par.wM/2, 24/par.wF/2, 24/par.wF/2] # initial guess is made 
+
         sol_case = optimize.minimize(
-            self.value_of_choice, initial_guess, method="Nelder-Mead", args=(self))
+            objective, initial_guess, method="Nelder-Mead", bounds = bounds)
         
         # unpack solution
-        LM = sol_case.LM
-        HM = sol_case.HM
-        LF = sol_case.LF
-        HF = sol_case.HF
-        print(LM,HM,LF,HF)
+        sol.LM = sol_case.x[0]
+        sol.HM = sol_case.x[1]
+        sol.LF = sol_case.x[2]
+        sol.HF = sol_case.x[3]
+        print(sol.LM,sol.HM, sol.LF, sol.HF)
 
+        return sol
 
+    #´Define the how the cont changes with wF
+    def changes_wF(self):
+        """ plots the the log relations for different values of wF"""
+        par = self.par
+     
+
+        log_workratios = [] #initialize empty list
+        log_wageratios = [] #initialize empty list
+
+        # a. loop over the different values for wF
+        for par.wF in par.wF_vec:
+            result = self.solve_cont(par.wF)
+            log_workratiosCalc = np.log(result.HF / result.HM)
+            log_workratios.append(log_workratiosCalc)
+            log_wageratiosCalc = np.log(par.wF / par.wM)
+            log_wageratios.append(log_wageratiosCalc)
+        
+        # b. plot figure for different values of wF
+        fig = plt.figure()
+        ax = fig.add_subplot(1, 1, 1)
+        ax.scatter(log_wageratios, log_workratios )
+        ax.set_ylabel("log_workratios")
+        ax.set_xlabel("log_wageratios")
+        ax.set_title("Log workratios and log wage ratios when varying female wages")
+        ax.set_ylim()
+        ax.set_xlim()
 
         
     
