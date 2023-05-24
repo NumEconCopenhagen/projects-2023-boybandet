@@ -18,24 +18,22 @@ class OLGModelClass():
 
         if do_print: print('calling .allocate()')
         self.allocate()
-    
-
-
-
-
+   
     def setup(self):
         """ baseline parameters """
 
         par = self.par
 
         # a. household
-        # par.sigma = 2.0 # CRRA coefficient
-        par.beta = 1/1.40 # discount factor
+        par.sigma = 2.0 # CRRA coefficient
+        par.beta = 1/1.35 # discount factor
+        par.n = 0.02 # population growth rate
+        par.g = 0.03 # productivity growth rate
 
         # b. firms
-        # par.production_function = 'ces'
+        par.production_function = 'ces'
         par.alpha = 0.30 # capital weight
-        # par.theta = 0.05 # substitution parameter
+        par.theta = 0.05 # substitution parameter
         par.delta = 0.50 # depreciation rate
 
         # c. government
@@ -45,29 +43,18 @@ class OLGModelClass():
         # d. misc
         par.K_lag_ini = 1.0 # initial capital stock
         par.B_lag_ini = 0.0 # initial government debt
+        par.L_lag_ini = 1.0 # initial labor supply
+        par.A_lag_ini = 1.0 # initial productivity
         par.simT = 50 # length of simulation
-        
-        # a. production
-        par.production_function = 'cobb-douglas'
-        par.theta = 0.0
-
-        # b. households
-        par.sigma = 1.0
-
-        # c. government
-        par.tau_w = 0.0
-        par.tau_r = 0.0
-        # sim.balanced_budget[:] = True # G changes to achieve this
-
-
-
+      
     def anaSSk(self):
-        par = self.par
-        sim = self.sim   
-        K_ss = ((1-par.alpha)/((1+1.0/par.beta)))**(1/(1-par.alpha))
-        par.K_lag_ini = 0.1*K_ss
+        par = self.par # a. unpack parameters
+        sim = self.sim   # b. unpack variables
+        K_ss = ((1-par.alpha)/((1+par.n)*(1+par.g)*(1+1.0/par.beta)))**(1/(1-par.alpha)) # c. steady state capital stock
 
-        return K_ss 
+        par.K_lag_ini = 0.1*K_ss # d. initial capital stock
+
+        return K_ss # e. steady state capital stock
 
     def allocate(self):
         """ allocate arrays for simulation """
@@ -80,9 +67,11 @@ class OLGModelClass():
         firm = ['K','Y','K_lag']
         prices = ['w','rk','rb','r','rt']
         government = ['G','T','B','balanced_budget','B_lag']
+        population = ['L','L_lag']
+        productivity = ['A','A_lag']
 
         # b. allocate
-        allvarnames = household + firm + prices + government
+        allvarnames = household + firm + prices + government + population + productivity
         for varname in allvarnames:
             sim.__dict__[varname] = np.nan*np.ones(par.simT)
 
@@ -95,8 +84,11 @@ class OLGModelClass():
         sim = self.sim
         
         # a. initial values
-        sim.K_lag[0] = par.K_lag_ini
-        sim.B_lag[0] = par.B_lag_ini
+        sim.K_lag[0] = par.K_lag_ini # initial capital stock
+        sim.B_lag[0] = par.B_lag_ini # initial government debt
+        sim.L.Lag[0] = par,L_lag_ini # initial labor supply
+        sim.A_lag[0] = par.A_lag_ini  # initial productivity
+        sim.k_lag[0] = sim.K_lag[0]/sim.L_lag[0] # initial capital per worker
 
         # b. iterate
         for t in range(par.simT):
@@ -185,25 +177,28 @@ def simulate_before_s(par,sim,t):
     if t > 0:
         sim.K_lag[t] = sim.K[t-1]
         sim.B_lag[t] = sim.B[t-1]
+        sim.L.Lag[t] = sim.L[t-1]*(1+par.n) #Allows us to simulate the population growth
+        sim.A_lag[t] = sim.A[t-1]*(1+par.g) #Allows us to simulate the productivity growth
+        sim_k_lag[t] = sim.K.lag[t]/sim.L.Lag[t] #Allows us to simulate the capital per worker
 
     # a. production and factor prices
     if par.production_function == 'ces':
 
         # i. production
-        sim.Y[t] = ( par.alpha*sim.K_lag[t]**(-par.theta) + (1-par.alpha)*(1.0)**(-par.theta) )**(-1.0/par.theta)
+        sim.Y[t] = ( par.alpha*sim.K_lag[t]**(-par.theta) + (1-par.alpha)*(sim.A.Lag[t]*sim.L.Lag[t])**(-par.theta) )**(-1.0/par.theta) #Changed to inclue population growth
 
         # ii. factor prices
         sim.rk[t] = par.alpha*sim.K_lag[t]**(-par.theta-1) * sim.Y[t]**(1.0+par.theta)
-        sim.w[t] = (1-par.alpha)*(1.0)**(-par.theta-1) * sim.Y[t]**(1.0+par.theta)
+        sim.w[t] = (1-par.alpha)*(sim.A.Lag[t]*sim.L.Lag[t]*)**(-par.theta-1) * sim.Y[t]**(1.0+par.theta)
 
     elif par.production_function == 'cobb-douglas':
 
         # i. production
-        sim.Y[t] = sim.K_lag[t]**par.alpha * (1.0)**(1-par.alpha)
+        sim.Y[t] = sim.K_lag[t]**par.alpha * (sim.A.Lag[t]*sim.L.Lag[t])**(1-par.alpha)
 
         # ii. factor prices
-        sim.rk[t] = par.alpha * sim.K_lag[t]**(par.alpha-1) * (1.0)**(1-par.alpha)
-        sim.w[t] = (1-par.alpha) * sim.K_lag[t]**(par.alpha) * (1.0)**(-par.alpha)
+        sim.rk[t] = par.alpha * sim.K_lag[t]**(par.alpha-1) * (sim.A.Lag[t]*sim.L.Lag[t])**(1-par.alpha)
+        sim.w[t] = (1-par.alpha) * sim.K_lag[t]**(par.alpha) * (sim.A.Lag[t]*sim.L.Lag[t])**(-par.alpha)
 
     else:
 
@@ -229,7 +224,7 @@ def simulate_after_s(par,sim,t,s):
     """ simulate forward """
 
     # a. consumption of young
-    sim.C1[t] = (1-par.tau_w)*sim.w[t]*(1.0-s)
+    sim.C1[t] = (1-par.tau_w)*sim.w[t]*sim.A.Lag[t]*sim.L.Lag[t]*(1.0-s)
 
     # b. end-of-period stocks
     I = sim.Y[t] - sim.C1[t] - sim.C2[t] - sim.G[t]

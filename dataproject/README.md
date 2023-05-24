@@ -2,7 +2,7 @@
 
 Our project is titled **Inflation and the consequences on key factors in the American economy** and is about the relationship between unemployment and inflation and how growth in GDP is very tightly correlated to inflation.
 
-The **results** of the project can be seen from running [dataproject.ipynb](dataproject.ipynb).
+The **results** of the project can be seen from running [dataproject.ipynb](dataproject.ipynb). Please make sure the [dataproject.py](dataproject.py) has been run beforehand.
 
 We apply the **following datasets** which have been collected using API from the World bank:
 
@@ -11,7 +11,7 @@ We apply the **following datasets** which have been collected using API from the
 1. Employment to population ratio, 15+, total (%) (national estimate) - United States (*API: SL.EMP.TOTL.SP.NE.ZS*)
 1. Real interest rate (%) - United States (*API: FR.INR.RINR*)
 
-**Dependencies:** Apart from a standard Anaconda Python 3 installation, the project requires the following installations:
+**Dependencies:** Apart from a standard Anaconda Python 3 installation, the project requires the following installations (these are also provided in the .ipynb file):
 
 ``pip install matplotlib-venn``
 ``pip install git+https://github.com/alemartinello/dstapi``
