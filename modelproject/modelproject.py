@@ -1,87 +1,236 @@
-from scipy import optimize
+from types import SimpleNamespace
+import time
 import numpy as np
 from scipy import optimize
-import sympy as sp
-import matplotlib.pyplot as plt
-import ipywidgets as widgets
-from IPython.display import display
 
-# Define the function that will be called when the sliders change
-def update_plot(T, alpha, delta, beta, n, s):
-    # Initialize arrays for variables
-    K = np.zeros(T)   # capital stock
-    L = np.zeros(T)   # Labour stock
-    C = np.zeros(T)     # consumption
-    S = np.zeros(T)   # Savings
-    r = np.zeros(T)     # interest rate
-    w = np.zeros(T)     # wage rate
+class OLGModelClass():
 
-    # Intial guesses
-    K[0] = 1
-    L[0] = 1
+    def __init__(self,do_print=True):
+        """ create the model """
 
-    # Loop over time periods
-    for t in range(1, T):
-        # Update capital
-        K[t] = (1-delta)*K[t-1] + S[t-1]
+        if do_print: print('initializing the model:')
 
-        # Update labour
-        L[t] = L[t-1]*(1+n)
+        self.par = SimpleNamespace()
+        self.sim = SimpleNamespace()
 
-        # Calculate wage rate
-        w[t] = (1 - alpha) * (K[t] / L[t]) ** alpha
+        if do_print: print('calling .setup()')
+        self.setup()
 
-        # Calculate interest rate
-        r[t] = alpha * (L[t] / K[t]) ** (1 - alpha) - delta
+        if do_print: print('calling .allocate()')
+        self.allocate()
+    
 
-        # Calculate savings
-        S[t] = s*w[t]
 
-        # Calculate consumption
-        if t < T-1:
-            C[t] = beta * (1 + r[t+1]) * (L[t] * w[t] + (1 - delta) * K[t] - S[t])
 
-        # Check for negative values of capital and labour
-        if K[t] < 0:
-            K[t] = 0
-        if L[t] < 0:
-            L[t] = 0
 
-    # Create a figure with subplots
-    fig, axs = plt.subplots(2, 3, figsize=(14, 10))
+    def setup(self):
+        """ baseline parameters """
 
-    # Plot capital stock
-    axs[0, 0].plot(K[1:])
-    axs[0, 0].set_title('Capital Stock')
-    axs[0, 0].set_xlabel('Time Periods')
-    axs[0, 0].set_ylabel('Capital Stock')
+        par = self.par
 
-    # Plot wage rate
-    axs[0, 1].plot(w[1:])
-    axs[0, 1].set_title('Wage Rate')
-    axs[0, 1].set_xlabel('Time Periods')
-    axs[0, 1].set_ylabel('Wage Rate')
+        # a. household
+        # par.sigma = 2.0 # CRRA coefficient
+        par.beta = 1/1.40 # discount factor
 
-    # Plot interest rate
-    axs[0, 2].plot(r[1:])
-    axs[0, 2].set_title('Interest Rate')
-    axs[0, 2].set_xlabel('Time Periods')
-    axs[0, 2].set_ylabel('Interest Rate')
+        # b. firms
+        # par.production_function = 'ces'
+        par.alpha = 0.30 # capital weight
+        # par.theta = 0.05 # substitution parameter
+        par.delta = 0.50 # depreciation rate
 
-    # Plot labour stock
-    axs[1, 0].plot(L[1:])
-    axs[1, 0].set_title('Labour Stock')
-    axs[1, 0].set_xlabel('Time Periods')
-    axs[1, 0].set_ylabel('Labour Stock')
+        # c. government
+        par.tau_w = 0.10 # labor income tax
+        par.tau_r = 0.20 # capital income tax
 
-    # Plot consumption
-    axs[1, 1].plot(C[1:99])
-    axs[1, 1].set_title('Consumption')
-    axs[1, 1].set_xlabel('Time Periods')
-    axs[1, 1].set_ylabel('Consumption')
+        # d. misc
+        par.K_lag_ini = 1.0 # initial capital stock
+        par.B_lag_ini = 0.0 # initial government debt
+        par.simT = 50 # length of simulation
+        
+        # a. production
+        par.production_function = 'cobb-douglas'
+        par.theta = 0.0
 
-    # Plot consumption
-    axs[1, 2].plot(S[1:])
-    axs[1, 2].set_title('Savings')
-    axs[1, 2].set_xlabel('Time Periods')
-    axs[1, 2].set_ylabel('Savings')
+        # b. households
+        par.sigma = 1.0
+
+        # c. government
+        par.tau_w = 0.0
+        par.tau_r = 0.0
+        # sim.balanced_budget[:] = True # G changes to achieve this
+
+
+
+    def anaSSk(self):
+        par = self.par
+        sim = self.sim   
+        K_ss = ((1-par.alpha)/((1+1.0/par.beta)))**(1/(1-par.alpha))
+        par.K_lag_ini = 0.1*K_ss
+
+        return K_ss 
+
+    def allocate(self):
+        """ allocate arrays for simulation """
+        
+        par = self.par
+        sim = self.sim
+
+        # a. list of variables
+        household = ['C1','C2']
+        firm = ['K','Y','K_lag']
+        prices = ['w','rk','rb','r','rt']
+        government = ['G','T','B','balanced_budget','B_lag']
+
+        # b. allocate
+        allvarnames = household + firm + prices + government
+        for varname in allvarnames:
+            sim.__dict__[varname] = np.nan*np.ones(par.simT)
+
+    def simulate(self,do_print=True):
+        """ simulate model """
+
+        t0 = time.time()
+
+        par = self.par
+        sim = self.sim
+        
+        # a. initial values
+        sim.K_lag[0] = par.K_lag_ini
+        sim.B_lag[0] = par.B_lag_ini
+
+        # b. iterate
+        for t in range(par.simT):
+            
+            # i. simulate before s
+            simulate_before_s(par,sim,t)
+
+            if t == par.simT-1: continue          
+
+            # i. find bracket to search
+            s_min,s_max = find_s_bracket(par,sim,t)
+
+            # ii. find optimal s
+            obj = lambda s: calc_euler_error(s,par,sim,t=t)
+            result = optimize.root_scalar(obj,bracket=(s_min,s_max),method='bisect')
+            s = result.root
+
+            # iii. simulate after s
+            simulate_after_s(par,sim,t,s)
+
+        if do_print: print(f'simulation done in {time.time()-t0:.2f} secs')
+
+def find_s_bracket(par,sim,t,maxiter=500,do_print=False):
+    """ find bracket for s to search in """
+
+    # a. maximum bracket
+    s_min = 0.0 + 1e-8 # save almost nothing
+    s_max = 1.0 - 1e-8 # save almost everything
+
+    # b. saving a lot is always possible 
+    value = calc_euler_error(s_max,par,sim,t)
+    sign_max = np.sign(value)
+    if do_print: print(f'euler-error for s = {s_max:12.8f} = {value:12.8f}')
+
+    # c. find bracket      
+    lower = s_min
+    upper = s_max
+
+    it = 0
+    while it < maxiter:
+                
+        # i. midpoint and value
+        s = (lower+upper)/2 # midpoint
+        value = calc_euler_error(s,par,sim,t)
+
+        if do_print: print(f'euler-error for s = {s:12.8f} = {value:12.8f}')
+
+        # ii. check conditions
+        valid = not np.isnan(value)
+        correct_sign = np.sign(value)*sign_max < 0
+        
+        # iii. next step
+        if valid and correct_sign: # found!
+            s_min = s
+            s_max = upper
+            if do_print: 
+                print(f'bracket to search in with opposite signed errors:')
+                print(f'[{s_min:12.8f}-{s_max:12.8f}]')
+            return s_min,s_max
+        elif not valid: # too low s -> increase lower bound
+            lower = s
+        else: # too high s -> increase upper bound
+            upper = s
+
+        # iv. increment
+        it += 1
+
+    raise Exception('cannot find bracket for s')
+
+def calc_euler_error(s,par,sim,t):
+    """ target function for finding s with bisection """
+
+    # a. simulate forward
+    simulate_after_s(par,sim,t,s)
+    simulate_before_s(par,sim,t+1) # next period
+
+    # c. Euler equation
+    LHS = sim.C1[t]**(-par.sigma)
+    RHS = (1+sim.rt[t+1])*par.beta * sim.C2[t+1]**(-par.sigma)
+
+    return LHS-RHS
+
+def simulate_before_s(par,sim,t):
+    """ simulate forward """
+
+    if t > 0:
+        sim.K_lag[t] = sim.K[t-1]
+        sim.B_lag[t] = sim.B[t-1]
+
+    # a. production and factor prices
+    if par.production_function == 'ces':
+
+        # i. production
+        sim.Y[t] = ( par.alpha*sim.K_lag[t]**(-par.theta) + (1-par.alpha)*(1.0)**(-par.theta) )**(-1.0/par.theta)
+
+        # ii. factor prices
+        sim.rk[t] = par.alpha*sim.K_lag[t]**(-par.theta-1) * sim.Y[t]**(1.0+par.theta)
+        sim.w[t] = (1-par.alpha)*(1.0)**(-par.theta-1) * sim.Y[t]**(1.0+par.theta)
+
+    elif par.production_function == 'cobb-douglas':
+
+        # i. production
+        sim.Y[t] = sim.K_lag[t]**par.alpha * (1.0)**(1-par.alpha)
+
+        # ii. factor prices
+        sim.rk[t] = par.alpha * sim.K_lag[t]**(par.alpha-1) * (1.0)**(1-par.alpha)
+        sim.w[t] = (1-par.alpha) * sim.K_lag[t]**(par.alpha) * (1.0)**(-par.alpha)
+
+    else:
+
+        raise NotImplementedError('unknown type of production function')
+
+    # b. no-arbitrage and after-tax return
+    sim.r[t] = sim.rk[t]-par.delta # after-depreciation return
+    sim.rb[t] = sim.r[t] # same return on bonds
+    sim.rt[t] = (1-par.tau_r)*sim.r[t] # after-tax return
+
+    # c. consumption
+    sim.C2[t] = (1+sim.rt[t])*(sim.K_lag[t]+sim.B_lag[t])
+
+    # d. government
+    sim.T[t] = par.tau_r*sim.r[t]*(sim.K_lag[t]+sim.B_lag[t]) + par.tau_w*sim.w[t]
+
+    if sim.balanced_budget[t]:
+        sim.G[t] = sim.T[t] - sim.r[t]*sim.B_lag[t]
+
+    sim.B[t] = (1+sim.r[t])*sim.B_lag[t] - sim.T[t] + sim.G[t]
+
+def simulate_after_s(par,sim,t,s):
+    """ simulate forward """
+
+    # a. consumption of young
+    sim.C1[t] = (1-par.tau_w)*sim.w[t]*(1.0-s)
+
+    # b. end-of-period stocks
+    I = sim.Y[t] - sim.C1[t] - sim.C2[t] - sim.G[t]
+    sim.K[t] = (1-par.delta)*sim.K_lag[t] + I
