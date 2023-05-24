@@ -57,11 +57,11 @@ class HouseholdSpecializationModelClass:
         C = par.wM*LM + par.wF*LF
 
         # b. home production for different values of sigma
-        if par.sigma == 1:
+        if par.sigma == 1.0:
             H = HM**(1-par.alpha)*HF**par.alpha
         
-        elif par.sigma == 0:
-            H = np.minimum(HM, HF)
+        elif par.sigma == 0.0:
+            H = np.fmin(HM, HF)
         
         else:
             HM = np.fmax(HM, 1e-07)
@@ -71,7 +71,7 @@ class HouseholdSpecializationModelClass:
     
         # c. total consumption utility
         Q = C**par.omega*H**(1-par.omega)
-        utility = np.fmax(Q,1e-8)**(1-par.rho)/(1-par.rho)
+        utility = np.fmax(Q,1e-08)**(1-par.rho)/(1-par.rho)
 
         # d. disutlity of work
         epsilon_ = 1+1/par.epsilon
@@ -221,13 +221,13 @@ class HouseholdSpecializationModelClass:
         # We define bounds
         bounds = ((0,24), (0,24), (0,24), (0,24))
 
-        initial_guess = [24/par.wM/2, 24/par.wM/2, 24/par.wF/2, 24/par.wF/2] # initial guess is made 
+        initial_guess = [5,5,5,5] # initial guess is made 
 
         # We make constraints to prevent workrates > 24
         constraints = ({"type": "ineq", "fun": lambda x: 24 - (x[0] + x[1])}, {"type": "ineq", "fun": lambda x: 24 - (x[2] + x[3])})
 
         sol_case = optimize.minimize(
-            objective, initial_guess, method="Nelder-Mead", bounds = bounds, constraints = constraints)
+            objective, initial_guess, method="SLSQP", bounds = bounds, constraints = constraints, tol= 0.000000000001)
         
         # unpack solution
         opt.LM = sol_case.x[0]
@@ -246,24 +246,13 @@ class HouseholdSpecializationModelClass:
         self.solve_wF_vec()
         log_workratios = np.log(sol.HF_vec / sol.HM_vec)
         log_wageratios = np.log(par.wF_vec)
-        # log_workratios = [] #initialize empty list
-        # log_wageratios = [] #initialize empty list
-
-        # a. loop over the different values for wF
-        # for par.wF in par.wF_vec:
-        #     result = self.solve_cont(par.wF)
-        #     log_workratiosCalc = np.log(result.HF / result.HM)
-        #     log_workratios.append(log_workratiosCalc)
-        #     log_wageratiosCalc = np.log(par.wF / par.wM)
-        #     log_wageratios.append(log_wageratiosCalc)
-
-        #     pass
+       
         
         if doprint:
             #b. plot figure for different values of wF
             fig = plt.figure()
             ax = fig.add_subplot(1, 1, 1)
-            ax.scatter(log_wageratios, log_workratios )
+            ax.scatter(log_wageratios, log_workratios)
             ax.set_ylabel("log of HF/HM")
             ax.set_xlabel("log of wF/wM")
             ax.set_title("Log work ratios and log wage ratios when varying female wages")
@@ -272,20 +261,31 @@ class HouseholdSpecializationModelClass:
 
         
     
-    def solve_wF_vec(self):  #MIGHT BE DELETED!
+    def solve_wF_vec(self): 
         """ solve model for vector of female wages """
 
         par = self.par
         sol = self.sol
 
-        for i, wF in enumerate(par.wF_vec):
+        # initialize vectors
+        logHF_HM=[]
+        logwF_wM=[]
+
+        for i, x in enumerate(par.wF_vec):
             #Set wF for this iteration
-            par.wF = wF
+            par.wF = x
             #Solve for optimal choices
             opt = self.solve_cont()
             #Store results in solution arrays
             sol.HM_vec[i] = opt.HM
             sol.HF_vec[i] = opt.HF
+            sol.LM_vec[i] = opt.LM
+            sol.LF_vec[i] = opt.LF
+            # append vectors of results
+
+            logHF_HM.append(np.log(opt.HF/opt.HM))
+            logwF_wM.append(np.log(x/par.wM))
+        return logwF_wM, logHF_HM
 
             
             
@@ -321,7 +321,8 @@ class HouseholdSpecializationModelClass:
             par = self.par
             sol = self.sol
 
-            par.alpha, par.sigma = x 
+            par.alpha = x[0] 
+            par.sigma = x[1] 
 
             target_beta0 = par.beta0_target
             target_beta1 = par.beta1_target
