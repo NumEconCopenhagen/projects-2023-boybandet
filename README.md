@@ -6,6 +6,6 @@
 - zcg648
 
 This repository contains  
-1. Inaugural project. 
-2. Data project. We fetch data from **source x** on **y** and show that ...
-3. Model project. We model ...
+1. Inaugural project. We analyse a **Household maximazation problem** from working from home, between two genders **male** and **female**.
+2. Data project. We fetch data from **The World Bank** on **GDP growth (annual %)**, **Inflation, consumer prices (annual %)**, **Employment to population ratio, 15+, total (%) (national estimate)** and **Real interest rate (%)**. We show relationship between **unemployment** and **inflation** and the correlation in **GDP** and **inflation**.
+3. Model project. We model the **OLG model** with growth in **population (L)** and **productivity (A)**
