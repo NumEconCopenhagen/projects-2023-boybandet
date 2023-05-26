@@ -215,7 +215,7 @@ class Model2:
        
         sigma = result.x
 
-        print("Optimal values for alpha and sigma are " + str(par.alpha)  + " and "+ str(sigma) +". Down below a plot that illustrates how the model fits the data is made")
+        print("Optimal values for alpha and sigma are " + str(par.alpha)  + " and "+ str(sigma))
 
 
 
